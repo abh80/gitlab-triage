@@ -129,6 +129,14 @@ const ConfigSchema = z.object({
 
 export class ConfigValidator {
   validate(config) {
+    if (!config || typeof config !== 'object') {
+      return { valid: false, errors: ['Configuration must be an object'] };
+    }
+
+    if (Object.keys(config).length === 0) {
+      return { valid: false, errors: ["Configuration must contain resource_rules"] };
+    }
+
     try {
       ConfigSchema.parse(config);
       return { valid: true, errors: [] };

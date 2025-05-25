@@ -67,7 +67,9 @@ export class ActionExecutor {
   async removeLabels(resource, labels, dryRun) {
     log(`Removing labels: ${labels} from resource: ${resource.id}`);
     if (!dryRun) {
-      await this.gitlab.Issues.removeLabels(resource.project_id, resource.iid, labels);
+      await this.gitlab.Issues.edit(resource.project_id, resource.iid, {
+        labels: resource.labels.filter(x => !labels.contains(x)),
+      });
     }
   }
 
@@ -143,6 +145,7 @@ export class ActionExecutor {
     }
   }
 }
+
 /**
  * Replaces placeholders in a comment template with corresponding values from a resource object.
  *
@@ -195,7 +198,7 @@ function unmarkComment(resource, commentTemplate) {
     downvotes: resource.downvotes,
     title: resource.title,
     web_url: resource.web_url,
-    full_reference: resource.reference,
+    full_reference: resource.references.full,
     type: resource.type,
   };
 

@@ -9,6 +9,9 @@ import {
   isBefore,
   isAfter,
 } from 'date-fns';
+
+import vm from 'vm';
+
 import debug from 'debug';
 
 const log = debug('platinum-triage:policy');
@@ -111,8 +114,8 @@ export class PolicyEngine {
         return this.evaluateIssueTypeCondition(resource, conditionValue);
       case 'discussions':
         return this.evaluateDiscussionsCondition(resource, conditionValue);
-      case 'ruby':
-        return this.evaluateRubyCondition(resource, conditionValue);
+      case 'js':
+        return this.evaluateJavaScriptCondition(resource, conditionValue);
       default:
         // Check for custom filters
         if (this.customFilters.has(conditionType)) {
@@ -359,16 +362,6 @@ export class PolicyEngine {
   }
 
   /**
-   * Evaluates Ruby expressions (simplified - in a real implementation this would need a Ruby interpreter)
-   */
-  evaluateRubyCondition(resource, rubyExpression) {
-    log(`Ruby condition not fully implemented: ${rubyExpression}`);
-    // In a real implementation, this would evaluate Ruby code
-    // For now, we'll return true as a placeholder
-    return true;
-  }
-
-  /**
    * Applies limits to a collection of resources
    * @param {Array} resources - The resources to limit
    * @param {Object} limits - The limit configuration
@@ -416,5 +409,33 @@ export class PolicyEngine {
     }
 
     return filteredResources;
+  }
+
+  /**
+   * Evaluates JavaScript expressions for a resource
+   * @import { IssueSchema, MergeSchema } from "@gitbeaker/rest"
+   * @param {IssueSchema|MergeSchema} resource - The resource to evaluate
+   * @param {string} jsExpression - The JavaScript expression to evaluate
+   * @returns {boolean} True if the expression evaluates to a truthy value
+   */
+  evaluateJavaScriptCondition(resource, jsExpression) {
+    const context = {
+      resource,
+      milestone: resource.milestone,
+      labels: resource.labels || [],
+      author: resource.author,
+      state: resource.state,
+      full_reference: resource.references.full,
+      Date
+    };
+
+    try {
+      const script = new vm.Script(jsExpression);
+      const sandbox = vm.createContext(context);
+      return script.runInContext(sandbox);
+    } catch (error) {
+      log(`Error evaluating JavaScript condition: ${error.message}`);
+      return false;
+    }
   }
 }

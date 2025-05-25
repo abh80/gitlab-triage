@@ -1,0 +1,13 @@
+resource_rules:
+  issues:
+    rules:
+      - name: Remove help-needed::* and unassigned labels on assigned issue
+        conditions:
+          state: opened
+          js: resource["assignees"].length == 0
+        actions:
+          remove_labels:
+            - help-needed::triage
+            - help-needed::investigation
+            - help-needed::devel
+            - unassigned
