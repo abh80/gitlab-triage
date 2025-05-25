@@ -5,10 +5,19 @@
   "type": "module",
   "main": "index.js",
   "bin": {
-    "platinum-triage": "node ./bin/index.js"
+    "platinum-triage": "./bin/index.js"
   },
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "package": "pkg ."
+  },
+  "pkg": {
+    "targets": [
+      "node18-win-x64",
+      "node18-linux-x64",
+      "node18-macos-x64"
+    ],
+    "outputPath": "dist"
   },
   "keywords": [],
   "author": "",
@@ -29,5 +38,8 @@
     "ora": "^8.2.0",
     "yaml": "^2.8.0",
     "zod": "^3.25.28"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
   }
 }

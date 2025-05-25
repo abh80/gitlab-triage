@@ -164,15 +164,14 @@ export class PlatinumTriage {
 
   async processResourceType(rules, resourceType, sourceType, sourceId, dryRun) {
     log(`Processing ${rules.length} rules for ${resourceType}`);
+    const resources = await this.resourceProcessor.loadResources(
+      resourceType,
+      sourceType,
+      sourceId,
+    );
 
     for (const rule of rules) {
       try {
-        const resources = await this.resourceProcessor.loadResources(
-          resourceType,
-          sourceType,
-          sourceId,
-        );
-
         await this.processRule(rule, resources, resourceType, dryRun);
       } catch (error) {
         console.error(chalk.red(`Error processing rule "${rule.name}": ${error.message}`));
@@ -213,15 +212,13 @@ export class PlatinumTriage {
       console.log(chalk.blue(`\n📊 Summary Policy: ${summary.name}`));
 
       const summaryData = [];
+      const resources = await this.resourceProcessor.loadResources(
+        resourceType,
+        sourceType,
+        sourceId,
+      );
 
-      // Process each sub-rule
       for (const rule of summary.rules || []) {
-        const resources = await this.resourceProcessor.loadResources(
-          resourceType,
-          sourceType,
-          sourceId,
-        );
-
         const filteredResources = this.policyEngine.filterResources(
           resources,
           rule.conditions || {},
