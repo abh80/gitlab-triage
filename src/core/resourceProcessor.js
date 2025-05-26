@@ -1,6 +1,7 @@
 import debug from 'debug';
 
 const log = debug('platinum-triage:resourceProcessor');
+
 export class ResourceProcessor {
   constructor(gitlab) {
     this.gitlab = gitlab;
@@ -37,5 +38,22 @@ export class ResourceProcessor {
       log(`Error loading resources: ${error.message}`);
       throw error;
     }
+  }
+
+  async loadResourceByIid(resourceType, sourceType, sourceId, iid) {
+    log(`Loading resources: type=${resourceType}, sourceType=${sourceType}, sourceId=${sourceId}, iid=${iid}`);
+    if (resourceType === 'issues') {
+      return await this.gitlab.Issues.show(iid, { projectId: sourceId });
+    } else if (resourceType === 'merge_requests') {
+      return await this.gitlab.MergeRequests.show(sourceId, iid);
+    } else {
+      throw new Error(`Unsupported resource type: ${resourceType}`);
+    }
+  }
+
+  getResourceTypeFromReference(resourceReference) {
+    if (resourceReference.startsWith('#')) return 'issues';
+    else if (resourceReference.startsWith('!')) return 'merge_requests';
+    else throw new Error(`Invalid resource reference ${resourceReference}`);
   }
 }

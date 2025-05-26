@@ -40,6 +40,7 @@ export class PlatinumTriage {
 
     this.resourceProcessor = new ResourceProcessor(this.gitlab);
     this.actionExecutor = new ActionExecutor(this.gitlab);
+
   }
 
   /**
@@ -207,6 +208,45 @@ export class PlatinumTriage {
     }
   }
 
+  /**
+   * Runs a resource processing operation based on its Instance ID (IID).
+   *
+   * @async
+   * @param {Object} config - The configuration object used for processing.
+   * @param {string} sourceId - Identifier for the specific source to be processed.
+   * @param {string} source
+   * @param {string} resourceReference - The IID of the resource to process.
+   * @param {boolean} dryRun - If true, simulates the operation without applying changes.
+   * @throws {Error} Throws an error if the resource with the specified IID is not found.
+   * @returns {Promise<Object>} The result of the processed resource.
+   */
+  async runResourceByIID(config, sourceId, source, resourceReference, dryRun) {
+    const resourceType = this.resourceProcessor.getResourceTypeFromReference(resourceReference);
+    const iid = parseInt(resourceReference.slice(1));
+    const resource = await this.resourceProcessor.loadResourceByIid(resourceType, source, sourceId, iid);
+
+    if (!resource) {
+      throw new Error(`Resource with IID ${resourceIID} not found.`);
+    }
+    console.log(chalk.cyan(`📃 Processing single resource ${resourceType}: ${sourceId}:${resourceReference}`));
+    const resourceRules = config.resource_rules || {};
+    const rulesConfig = resourceRules[resourceType];
+    if (!rulesConfig || !rulesConfig.rules) return console.log(chalk.grey(`No rules to proccess for resource type: ${resourceType}`));
+    const rules = rulesConfig.rules;
+    log(`Processing ${rules.length} rules for ${resourceType}`);
+
+    for (const rule of rules) {
+      try {
+        await this.processRule(rule, [resource], resourceType, dryRun);
+      } catch (error) {
+        console.error(chalk.red(`Error processing rule "${rule.name}": ${error.message}`));
+        if (this.debug) {
+          console.error(error.stack);
+        }
+      }
+    }
+  }
+
   async processSummaryPolicies(summaries, resourceType, sourceType, sourceId, dryRun) {
     for (const summary of summaries) {
       console.log(chalk.blue(`\n📊 Summary Policy: ${summary.name}`));
@@ -243,5 +283,11 @@ export class PlatinumTriage {
         );
       }
     }
+  }
+
+  async processSpecificResource(config, source, sourceId, resourceReference, dryRun) {
+    if (source === 'groups') throw new Error('Source groups are not supported yet.');
+
+    await this.runResourceByIID(config, sourceId, source, resourceReference, dryRun);
   }
 }
