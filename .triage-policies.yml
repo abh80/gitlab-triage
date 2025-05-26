@@ -1,60 +1,172 @@
 resource_rules:
   issues:
+      rules:
+        - name: Set initial workflow stage
+          conditions:
+            state: opened
+            forbidden_labels:
+              - workflow:triage
+              - workflow:investigation
+              - workflow:in-progress
+          actions:
+            labels:
+              - workflow:triage
+
+        - name: Ensure that only one workflow label is used (1/2)
+          conditions:
+            state: opened
+            labels:
+              - workflow:triage
+              - workflow:investigation
+            forbidden_labels:
+              - workflow:in-progress
+          actions:
+            remove_labels:
+              - workflow:triage
+
+        - name: Remove help-needed:* and unassigned labels on assigned issue
+          conditions:
+            state: opened
+            js: resource["assignees"].length > 0
+            labels:
+              - help-needed:{triage, investigation, in-progress}
+              - unassigned
+          actions:
+            remove_labels:
+              - help-needed:triage
+              - help-needed:investigation
+              - help-needed:in-progress
+              - unassigned
+
+        - name: Add help-needed:triage and unassigned labels on unassigned issues
+          conditions:
+            state: opened
+            js: resource["assignees"].length == 0
+            labels:
+              - workflow:triage
+            forbidden_labels:
+              - help-needed:triage
+              - unassigned
+          actions:
+            labels:
+              - help-needed:triage
+              - unassigned
+
+        - name: Remove wrong help-needed:* labels for issues on triage stage
+          conditions:
+            state: opened
+            labels:
+              - workflow:triage
+              - help-needed:{investigation, in-progress}
+          actions:
+            remove_labels:
+              - help-needed:investigation
+              - help-needed:in-progress
+
+        - name: Add help-needed:investigation and unassigned labels on unassigned issues
+          conditions:
+            state: opened
+            js: resource["assignees"].length == 0
+            labels:
+              - workflow:investigation
+            forbidden_labels:
+              - help-needed:investigation
+              - unassigned
+          actions:
+            labels:
+              - help-needed:investigation
+              - unassigned
+
+        - name: Remove wrong help-needed:* labels for issues on investigation stage
+          conditions:
+            state: opened
+            labels:
+              - workflow:investigation
+              - help-needed:{triage, in-progress}
+          actions:
+            remove_labels:
+              - help-needed:triage
+              - help-needed:in-progress
+
+        - name: Add help-needed:in-progress and unassigned labels on unassigned issues
+          conditions:
+            state: opened
+            js: resource["assignees"].length == 0
+            labels:
+              - workflow:in-progress
+            forbidden_labels:
+              - help-needed:in-progress
+              - unassigned
+          actions:
+            labels:
+              - help-needed:in-progress
+              - unassigned
+
+        - name: Remove wrong help-needed:* labels for issues on in-progress stage
+          conditions:
+            state: opened
+            labels:
+              - workflow:in-progress
+              - help-needed:{triage, investigation}
+          actions:
+            remove_labels:
+              - help-needed:triage
+              - help-needed:investigation
+
+        - name: Remove triage:* labels if the issue is not triaged
+          conditions:
+            state: opened
+            labels:
+              - workflow:triage
+              - triaged:{bug, RFE}
+          actions:
+            remove_labels:
+              - triaged:bug
+              - triaged:RFE
+
+        - name: Ensure that only one triaged:* label is used
+          conditions:
+            state: opened
+            labels:
+              - triaged:bug
+              - triaged:RFE
+          actions:
+            remove_labels:
+              - triaged:RFE
+
+        - name: Mark issue as stale with no activity for 4 months
+          conditions:
+            state: opened
+            date:
+              attribute: updated_at
+              condition: older_than
+              interval_type: months
+              interval: 4
+            forbidden_labels:
+              - stale
+          actions:
+              comment: >-
+                This issue has been inactive for 4 months and got stale.
+                Contributions welcome to move it forward.
+              labels:
+                - stale
+
+
+  merge_requests:
     rules:
-      - name: Add "needs attention" label to unlabeled issues older than 5 days
+      - name: Mark merge-request as stale after no activity for 2 months
         conditions:
           date:
             attribute: updated_at
             condition: older_than
-            interval_type: days
-            interval: 5
+            interval_type: months
+            interval: 2
           state: opened
-          labels:
-            - None
-        limits:
-          most_recent: 50
+          forbidden_labels:
+            - stale
         actions:
-          labels:
-            - needs attention
-          comment: |
-            {{author}} This issue has been unlabeled for 5 days. Please add appropriate labels to help with triage.
-
-  merge_requests:
-    rules:
-      - name: Add "needs review" label to unlabeled MRs
-        conditions:
-          state: opened
-          labels:
-            - None
-        limits:
-          most_recent: 25
-        actions:
-          labels:
-            - needs review
-          comment: |
-            {{author}} This merge request needs labels. Please add appropriate labels for better organization.
-
-  # Example of summary policy
-  # issues:
-  #   summaries:
-  #     - name: Weekly triage summary
-  #       rules:
-  #         - name: New issues
-  #           conditions:
-  #             state: opened
-  #           limits:
-  #             most_recent: 10
-  #           actions:
-  #             summarize:
-  #               item: "- [ ] [{{title}}]({{web_url}}) {{labels}}"
-  #               summary: |
-  #                 Recent {{type}} requiring attention:
-  #
-  #                 {{items}}
-  #       actions:
-  #         summarize:
-  #           title: "Weekly Triage Summary"
-  #           summary: |
-  #             Weekly triage summary:
-  #
-  #             {{items}}
+            comment: |
+              This merge-request has been inactive for 2 months and got stale.
+              Work is necessary to move it forward.
+            labels:
+              - stale
