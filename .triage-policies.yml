@@ -1,13 +1,60 @@
 resource_rules:
   issues:
     rules:
-      - name: Remove help-needed::* and unassigned labels on assigned issue
+      - name: Add "needs attention" label to unlabeled issues older than 5 days
+        conditions:
+          date:
+            attribute: updated_at
+            condition: older_than
+            interval_type: days
+            interval: 5
+          state: opened
+          labels:
+            - None
+        limits:
+          most_recent: 50
+        actions:
+          labels:
+            - needs attention
+          comment: |
+            {{author}} This issue has been unlabeled for 5 days. Please add appropriate labels to help with triage.
+
+  merge_requests:
+    rules:
+      - name: Add "needs review" label to unlabeled MRs
         conditions:
           state: opened
-          js: resource["assignees"].length == 0
+          labels:
+            - None
+        limits:
+          most_recent: 25
         actions:
-          remove_labels:
-            - help-needed::triage
-            - help-needed::investigation
-            - help-needed::devel
-            - unassigned
+          labels:
+            - needs review
+          comment: |
+            {{author}} This merge request needs labels. Please add appropriate labels for better organization.
+
+  # Example of summary policy
+  # issues:
+  #   summaries:
+  #     - name: Weekly triage summary
+  #       rules:
+  #         - name: New issues
+  #           conditions:
+  #             state: opened
+  #           limits:
+  #             most_recent: 10
+  #           actions:
+  #             summarize:
+  #               item: "- [ ] [{{title}}]({{web_url}}) {{labels}}"
+  #               summary: |
+  #                 Recent {{type}} requiring attention:
+  #
+  #                 {{items}}
+  #       actions:
+  #         summarize:
+  #           title: "Weekly Triage Summary"
+  #           summary: |
+  #             Weekly triage summary:
+  #
+  #             {{items}}
