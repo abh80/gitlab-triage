@@ -1,4 +1,3 @@
-import ora from 'ora';
 import debug from 'debug';
 import { parse as parseYaml } from 'yaml';
 import chalk from 'chalk';
@@ -31,7 +30,7 @@ export class PlatinumTriage {
   constructor({ token, hostUrl, debug }) {
     this.token = token;
     this.hostUrl = hostUrl || 'https://gitlab.com';
-    this.debug = debug || false;
+    this.debug = process.env.DEBUG != null;
 
     this.gitlab = new Gitlab({
       token,

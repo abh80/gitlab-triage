@@ -21,9 +21,9 @@ export class ResourceProcessor {
     let resources = [];
 
     try {
-      if (resourceType === 'issues') {
+      if (resourceType === 'issue') {
         resources = await this.gitlab.Issues.all({ projectId: sourceId });
-      } else if (resourceType === 'merge_requests') {
+      } else if (resourceType === 'merge_request') {
         resources = await this.gitlab.MergeRequests.all({
           projectId: sourceId,
         });
@@ -42,9 +42,9 @@ export class ResourceProcessor {
 
   async loadResourceByIid(resourceType, sourceType, sourceId, iid) {
     log(`Loading resources: type=${resourceType}, sourceType=${sourceType}, sourceId=${sourceId}, iid=${iid}`);
-    if (resourceType === 'issues') {
+    if (resourceType === 'issue') {
       return await this.gitlab.Issues.show(iid, { projectId: sourceId });
-    } else if (resourceType === 'merge_requests') {
+    } else if (resourceType === 'merge_request') {
       return await this.gitlab.MergeRequests.show(sourceId, iid);
     } else {
       throw new Error(`Unsupported resource type: ${resourceType}`);
@@ -52,8 +52,8 @@ export class ResourceProcessor {
   }
 
   getResourceTypeFromReference(resourceReference) {
-    if (resourceReference.startsWith('#')) return 'issues';
-    else if (resourceReference.startsWith('!')) return 'merge_requests';
+    if (resourceReference.startsWith('#')) return 'issue';
+    else if (resourceReference.startsWith('!')) return 'merge_request';
     else throw new Error(`Invalid resource reference ${resourceReference}`);
   }
 }

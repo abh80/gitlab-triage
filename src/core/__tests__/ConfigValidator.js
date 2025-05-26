@@ -11,7 +11,7 @@ describe('ConfigValidator', () => {
     it('should validate a valid configuration', () => {
         const validConfig = {
             resource_rules: {
-                issues: {
+                issue: {
                     rules: [
                         {
                             name: 'Close old issues',
@@ -45,7 +45,7 @@ describe('ConfigValidator', () => {
     it('should validate summary policies', () => {
         const configWithSummaries = {
             resource_rules: {
-                issues: {
+                issue: {
                     summaries: [
                         {
                             name: 'Issue Summary',
@@ -83,7 +83,7 @@ describe('ConfigValidator', () => {
         const configWithHostUrl = {
             host_url: 'https://gitlab.example.com',
             resource_rules: {
-                issues: {
+                issue: {
                     rules: []
                 }
             }

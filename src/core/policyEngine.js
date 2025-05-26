@@ -117,7 +117,6 @@ export class PolicyEngine {
       case 'js':
         return this.evaluateJavaScriptCondition(resource, conditionValue);
       default:
-        // Check for custom filters
         if (this.customFilters.has(conditionType)) {
           const customFilter = this.customFilters.get(conditionType);
           return customFilter(resource, conditionValue);
@@ -410,7 +409,6 @@ export class PolicyEngine {
 
     return filteredResources;
   }
-
   /**
    * Evaluates JavaScript expressions for a resource
    * @import { IssueSchema, MergeSchema } from "@gitbeaker/rest"

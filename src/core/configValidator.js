@@ -119,8 +119,8 @@ const ConfigSchema = z.object({
   host_url: z.string().url().optional(),
   resource_rules: z
     .object({
-      issues: ResourceRulesSchema.optional(),
-      merge_requests: ResourceRulesSchema.optional(),
+      issue: ResourceRulesSchema.optional(),
+      merge_request: ResourceRulesSchema.optional(),
       epics: ResourceRulesSchema.optional(),
       branches: ResourceRulesSchema.optional(),
     })
