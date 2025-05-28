@@ -12,7 +12,6 @@ const log = debug('platinum-triage');
 
 export class PlatinumTriage {
   configValidator = new ConfigValidator();
-  policyEngine = new PolicyEngine();
 
   token;
   hostUrl;
@@ -39,7 +38,7 @@ export class PlatinumTriage {
 
     this.resourceProcessor = new ResourceProcessor(this.gitlab);
     this.actionExecutor = new ActionExecutor(this.gitlab);
-
+    this.policyEngine = new PolicyEngine(this.gitlab)
   }
 
   /**
@@ -204,6 +203,8 @@ export class PlatinumTriage {
     // Execute actions
     if (rule.actions) {
       await this.actionExecutor.execute(rule.actions, filteredResources, resourceType, dryRun);
+    } else {
+      console.log(chalk.yellow("No actions found to execute. Skipping..."))
     }
   }
 

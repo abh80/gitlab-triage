@@ -1,4 +1,5 @@
 import debug from 'debug';
+import chalk from 'chalk';
 
 const log = debug('platinum-triage:actionExecutor');
 
@@ -23,97 +24,203 @@ export class ActionExecutor {
    * @param {boolean} dryRun - If true, simulates the actions without making actual changes.
    */
   async execute(actions, resources, resourceType, dryRun) {
-    for (const resource of resources) {
-      log(`Executing actions for resource: ${resource.id}`);
+    for (let resource of resources) {
+      console.log(chalk.yellow(`Executing actions for resource: ${resource.id}`));
       if (actions.labels) {
-        await this.addLabels(resource, actions.labels, dryRun);
+        resource = await this.addLabels(resource, actions.labels, resourceType, dryRun);
       }
       if (actions.remove_labels) {
-        await this.removeLabels(resource, actions.remove_labels, dryRun);
+        resource = await this.removeLabels(resource, actions.remove_labels, resourceType, dryRun);
       }
       if (actions.status) {
-        await this.changeStatus(resource, actions.status, dryRun);
+        resource = await this.changeStatus(resource, actions.status, resourceType, dryRun);
       }
       if (actions.mention) {
-        await this.mentionUsers(resource, actions.mention, dryRun);
+        resource = await this.mentionUsers(resource, actions.mention, resourceType, dryRun);
       }
-      if (actions.move) {
-        await this.moveResource(resource, actions.move, dryRun);
+      if (actions.move && resourceType === 'issues') {
+        resource = await this.moveResource(resource, actions.move, dryRun);
       }
       if (actions.comment) {
-        await this.addComment(resource, actions, dryRun);
+        resource = await this.addComment(resource, actions, resourceType, dryRun);
       }
       if (actions.delete && resourceType === 'branches') {
         await this.deleteBranch(resource, dryRun);
       }
+      if (actions.assignee) {
+        resource = await this.assignResource(resource, actions.assignee, resourceType, dryRun);
+      }
+      if (actions.reviewer && resourceType === 'merge_requests') {
+        resource = await this.assignReviewer(resource, actions.reviewer, dryRun);
+      }
+      if (actions.merge && resourceType === 'merge_requests') {
+        resource = await this.mergeMergeRequest(resource, actions.merge, dryRun);
+      }
+    }
+  }
+
+  /**
+   * Gets the appropriate API client based on resource type
+   * @param {string} resourceType - The type of resource
+   * @returns {Object} - The appropriate GitLab API client
+   */
+  getApiClient(resourceType) {
+    switch (resourceType) {
+      case 'issues':
+        return this.gitlab.Issues;
+      case 'merge_requests':
+        return this.gitlab.MergeRequests;
+      default:
+        throw new Error(`Unsupported resource type: ${resourceType}`);
+    }
+  }
+
+  /**
+   * Gets the appropriate notes API client based on resource type
+   * @param {string} resourceType - The type of resource
+   * @returns {Object} - The appropriate GitLab notes API client
+   */
+  getNotesApiClient(resourceType) {
+    switch (resourceType) {
+      case 'issues':
+        return this.gitlab.IssueNotes;
+      case 'merge_requests':
+        return this.gitlab.MergeRequestNotes;
+      default:
+        throw new Error(`Unsupported resource type: ${resourceType}`);
     }
   }
 
   /**
    * @import { IssueSchema, MergeRequestSchema} from "@gitbeaker/rest"
    * @param {IssueSchema|MergeRequestSchema} resource - The resource object containing data to replace placeholders.
-   * @param labels
-   * @param dryRun
+   * @param {Array<string>} labels - Labels to add
+   * @param {string} resourceType - The type of resource
+   * @param {boolean} dryRun - If true, simulates the action
    */
-  async addLabels(resource, labels, dryRun) {
-    log(`Adding labels: ${labels} to resource: ${resource.id}`);
+  async addLabels(resource, labels, resourceType, dryRun) {
+    log(`Adding labels: ${labels} to ${resourceType.slice(0, -1)}: ${resource.id}`);
+    resource.labels = [...resource.labels, ...labels];
     if (!dryRun) {
-      await this.gitlab.Issues.edit(resource.project_id, resource.iid, {
-        labels: [...resource.labels, ...labels],
+      const apiClient = this.getApiClient(resourceType);
+      return await apiClient.edit(resource.project_id, resource.iid, {
+        labels: resource.labels,
       });
     }
+    return resource;
   }
 
-  async removeLabels(resource, labels, dryRun) {
-    log(`Removing labels: ${labels} from resource: ${resource.id}`);
+  async removeLabels(resource, labels, resourceType, dryRun) {
+    log(`Removing labels: ${labels} from ${resourceType.slice(0, -1)}: ${resource.id}`);
+    resource.labels = resource.labels.filter(x => !labels.includes(x));
     if (!dryRun) {
-      await this.gitlab.Issues.edit(resource.project_id, resource.iid, {
-        labels: resource.labels.filter(x => !labels.contains(x)),
+      const apiClient = this.getApiClient(resourceType);
+      return await apiClient.edit(resource.project_id, resource.iid, {
+        labels: resource.labels,
       });
     }
+    return resource;
   }
 
-  async changeStatus(resource, status, dryRun) {
-    log(`Changing status to: ${status} for resource: ${resource.id}`);
+  async changeStatus(resource, status, resourceType, dryRun) {
+    log(`Changing status to: ${status} for ${resourceType.slice(0, -1)}: ${resource.id}`);
     if (!dryRun) {
-      if (status === 'close') {
-        await this.gitlab.Issues.edit(resource.project_id, resource.iid, {
-          stateEvent: 'close',
-        });
-      } else if (status === 'reopen') {
-        await this.gitlab.Issues.edit(resource.project_id, resource.iid, {
-          stateEvent: 'reopen',
-        });
+      const apiClient = this.getApiClient(resourceType);
+      const updateParams = {};
+
+      if (resourceType === 'issues') {
+        updateParams.stateEvent = status;
+      } else if (resourceType === 'merge_requests') {
+        // For merge requests, status can be 'close', 'reopen', or 'merge'
+        if (status === 'close' || status === 'reopen') {
+          updateParams.stateEvent = status;
+        } else if (status === 'merge') {
+          // Handle merge separately as it requires different API call
+          return await this.mergeMergeRequest(resource, { when_pipeline_succeeds: false }, dryRun);
+        }
       }
+
+      return await apiClient.edit(resource.project_id, resource.iid, updateParams);
     }
+
+    return resource;
   }
 
-  async mentionUsers(resource, users, dryRun) {
-    const mentionText = users.map((user) => `@${user}`).join(' ');
-    log(`Mentioning users: ${mentionText} for resource: ${resource.id}`);
+  async assignResource(resource, assigneeId, resourceType, dryRun) {
+    log(`Assigning ${resourceType.slice(0, -1)}: ${resource.id} to user: ${assigneeId}`);
     if (!dryRun) {
-      await this.gitlab.IssueNotes.create(resource.project_id, resource.iid, mentionText);
+      const apiClient = this.getApiClient(resourceType);
+      return await apiClient.edit(resource.project_id, resource.iid, {
+        assignee_id: assigneeId,
+      });
     }
+    return resource;
+  }
+
+  async assignReviewer(resource, reviewerIds, dryRun) {
+    log(`Assigning reviewers: ${reviewerIds} to merge request: ${resource.id}`);
+    if (!dryRun) {
+      return await this.gitlab.MergeRequests.edit(resource.project_id, resource.iid, {
+        reviewer_ids: Array.isArray(reviewerIds) ? reviewerIds : [reviewerIds],
+      });
+    }
+    return resource;
+  }
+
+  async mergeMergeRequest(resource, mergeOptions, dryRun) {
+    log(`Merging merge request: ${resource.id}`);
+    if (!dryRun) {
+      const options = {
+        should_remove_source_branch: mergeOptions.should_remove_source_branch || false,
+        merge_when_pipeline_succeeds: mergeOptions.when_pipeline_succeeds || false,
+        merge_commit_message: mergeOptions.commit_message || undefined,
+        squash_commit_message: mergeOptions.squash_commit_message || undefined,
+        squash: mergeOptions.squash || false,
+      };
+
+      return await this.gitlab.MergeRequests.accept(resource.project_id, resource.iid, options);
+    }
+    return resource;
+  }
+
+  async mentionUsers(resource, users, resourceType, dryRun) {
+    const mentionText = users.map((user) => `@${user}`).join(' ');
+    log(`Mentioning users: ${mentionText} for ${resourceType.slice(0, -1)}: ${resource.id}`);
+    if (!dryRun) {
+      const notesClient = this.getNotesApiClient(resourceType);
+      await notesClient.create(resource.project_id, resource.iid, mentionText);
+    }
+    return resource;
   }
 
   async moveResource(resource, targetProjectPath, dryRun) {
-    log(`Moving resource: ${resource.id} to project: ${targetProjectPath}`);
+    log(`Moving issue: ${resource.id} to project: ${targetProjectPath}`);
     if (!dryRun) {
-      await this.gitlab.Issues.move(resource.project_id, resource.iid, targetProjectPath);
+      // Note: Only issues can be moved, not merge requests
+      return await this.gitlab.Issues.move(resource.project_id, resource.iid, targetProjectPath);
     }
+    return resource;
   }
 
-  async addComment(resource, actions, dryRun) {
+  async addComment(resource, actions, resourceType, dryRun) {
     const { comment_type, comment_internal } = actions;
     const comment = unmarkComment(resource, actions.comment);
-    log(`Adding comment to resource: ${resource.id} ${comment}`);
+    log(`Adding comment to ${resourceType.slice(0, -1)}: ${resource.id} ${comment}`);
     if (!dryRun) {
       const options = {
         internal: comment_internal || false,
-        type: comment_type || 'comment',
       };
-      await this.gitlab.IssueNotes.create(resource.project_id, resource.iid, comment, options);
+
+      // Note: comment_type might not be applicable for merge requests
+      if (resourceType === 'issues' && comment_type) {
+        options.type = comment_type;
+      }
+
+      const notesClient = this.getNotesApiClient(resourceType);
+      await notesClient.create(resource.project_id, resource.iid, comment, options);
     }
+
+    return resource;
   }
 
   async deleteBranch(resource, dryRun) {
@@ -121,6 +228,8 @@ export class ActionExecutor {
     if (!dryRun) {
       await this.gitlab.Branches.remove(resource.project_id, resource.name);
     }
+
+    return resource;
   }
 
   /**
@@ -158,14 +267,14 @@ export class ActionExecutor {
  * - `created_at` (string): The creation timestamp of the resource.
  * - `updated_at` (string): The last updated timestamp of the resource.
  * - `closed_at` (string): The timestamp when the resource was closed.
- * - `merged_at` (string): The timestamp when the resource was merged.
- * - `state` (string): The current state of the resource (e.g., open, closed).
+ * - `merged_at` (string): The timestamp when the resource was merged (merge requests only).
+ * - `state` (string): The current state of the resource (e.g., open, closed, merged).
  * - `author` (string): The username of the author of the resource.
  * - `assignee` (string|null): The username of the assigned user, or null if unassigned.
  * - `assignees` (Array<string>|null): An array of usernames of assigned users, or null if none.
- * - `reviewers` (Array<string>|null): An array of usernames of reviewers, or null if none.
+ * - `reviewers` (Array<string>|null): An array of usernames of reviewers, or null if none (merge requests only).
  * - `closed_by` (string|null): The username of the user who closed the resource, or null if not applicable.
- * - `merged_by` (string|null): The username of the user who merged the resource, or null if not applicable.
+ * - `merged_by` (string|null): The username of the user who merged the resource, or null if not applicable (merge requests only).
  * - `milestone` (string|null): The milestone associated with the resource, or null if none.
  * - `labels` (Array<string>|null): An array of labels associated with the resource, or null if none.
  * - `upvotes` (number): The number of upvotes the resource has received.
@@ -174,6 +283,10 @@ export class ActionExecutor {
  * - `web_url` (string): The web URL of the resource.
  * - `full_reference` (string): The full reference string of the resource (e.g., project/issue number).
  * - `type` (string): The type of the resource (e.g., issue, merge request).
+ * - `source_branch` (string): The source branch name (merge requests only).
+ * - `target_branch` (string): The target branch name (merge requests only).
+ * - `merge_status` (string): The merge status (merge requests only).
+ * - `pipeline_status` (string): The pipeline status (merge requests only).
  *
  * The `commentTemplate` string uses placeholders wrapped in double curly braces.
  * For example, `{{author}}` will be replaced with the `author` property of the resource.
@@ -186,20 +299,25 @@ function unmarkComment(resource, commentTemplate) {
     closed_at: resource.closed_at,
     merged_at: resource.merged_at,
     state: resource.state,
-    author: `@${resource.author.username}`,
-    assignee: resource.assignee ? `@${resource.assignee}` : null,
-    assignees: resource.assignees ? resource.assignees.map((a) => `@${a}`).join(', ') : null,
-    reviewers: resource.reviewers ? resource.reviewers.map((r) => `@${r}`).join(', ') : null,
-    closed_by: resource.closed_by ? `@${resource.closed_by}` : null,
-    merged_by: resource.merged_by ? `@${resource.merged_by}` : null,
-    milestone: resource.milestone,
+    author: resource.author ? `@${resource.author.username}` : '',
+    assignee: resource.assignee ? `@${resource.assignee.username}` : null,
+    assignees: resource.assignees ? resource.assignees.map((a) => `@${a.username || a}`).join(', ') : null,
+    reviewers: resource.reviewers ? resource.reviewers.map((r) => `@${r.username || r}`).join(', ') : null,
+    closed_by: resource.closed_by ? `@${resource.closed_by.username}` : null,
+    merged_by: resource.merged_by ? `@${resource.merged_by.username}` : null,
+    milestone: resource.milestone ? resource.milestone.title : null,
     labels: resource.labels ? resource.labels.map((l) => `~${l}`).join(', ') : null,
     upvotes: resource.upvotes,
     downvotes: resource.downvotes,
     title: resource.title,
     web_url: resource.web_url,
-    full_reference: resource.references.full,
-    type: resource.type,
+    full_reference: resource.references ? resource.references.full : '',
+    type: resource.type || (resource.merge_status !== undefined ? 'merge_request' : 'issue'),
+    // Merge request specific fields
+    source_branch: resource.source_branch,
+    target_branch: resource.target_branch,
+    merge_status: resource.merge_status,
+    pipeline_status: resource.head_pipeline ? resource.head_pipeline.status : null,
   };
 
   return commentTemplate.replace(/{{(.*?)}}/g, (_, key) => placeholders[key] || '');
