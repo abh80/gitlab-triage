@@ -1,6 +1,7 @@
 import debug from 'debug';
 import chalk from 'chalk';
 import * as path from 'node:path';
+import { pathToFileURL } from 'url';
 
 const log = debug('platinum-triage:actionExecutor');
 
@@ -59,8 +60,10 @@ export class ActionExecutor {
       }
       if (actions.extension) {
         log('Executing custom script action from ' + actions.extension);
-        const script = await import(path.join(process.cwd() , actions.extension));
-        const instanceOfScript = new script(this);
+        const filePath = path.join(process.cwd(), actions.extension);
+        const fileUrl = pathToFileURL(path.resolve(filePath)).href;
+        const script = await import(fileUrl);
+        const instanceOfScript = new script.default(this);
         await instanceOfScript.run(resource, resourceType, dryRun);
       }
     }
@@ -106,7 +109,7 @@ export class ActionExecutor {
    * @param {boolean} dryRun - If true, simulates the action
    */
   async addLabels(resource, labels, resourceType, dryRun) {
-    log(`Adding labels: ${labels} to ${resourceType.slice(0, -1)}: ${resource.id}`);
+    log(`Adding labels: ${labels} to ${resourceType}: ${resource.id}`);
     resource.labels = [...resource.labels, ...labels];
     if (!dryRun) {
       const apiClient = this.getApiClient(resourceType);
@@ -118,7 +121,7 @@ export class ActionExecutor {
   }
 
   async removeLabels(resource, labels, resourceType, dryRun) {
-    log(`Removing labels: ${labels} from ${resourceType.slice(0, -1)}: ${resource.id}`);
+    log(`Removing labels: ${labels} from ${resourceType}: ${resource.id}`);
     resource.labels = resource.labels.filter(x => !labels.includes(x));
     if (!dryRun) {
       const apiClient = this.getApiClient(resourceType);
@@ -130,7 +133,7 @@ export class ActionExecutor {
   }
 
   async changeStatus(resource, status, resourceType, dryRun) {
-    log(`Changing status to: ${status} for ${resourceType.slice(0, -1)}: ${resource.id}`);
+    log(`Changing status to: ${status} for ${resourceType}: ${resource.id}`);
     if (!dryRun) {
       const apiClient = this.getApiClient(resourceType);
       const updateParams = {};
@@ -154,7 +157,7 @@ export class ActionExecutor {
   }
 
   async assignResource(resource, assigneeId, resourceType, dryRun) {
-    log(`Assigning ${resourceType.slice(0, -1)}: ${resource.id} to user: ${assigneeId}`);
+    log(`Assigning ${resourceType}: ${resource.id} to user: ${assigneeId}`);
     if (!dryRun) {
       const apiClient = this.getApiClient(resourceType);
       return await apiClient.edit(resource.project_id, resource.iid, {
@@ -192,7 +195,7 @@ export class ActionExecutor {
 
   async mentionUsers(resource, users, resourceType, dryRun) {
     const mentionText = users.map((user) => `@${user}`).join(' ');
-    log(`Mentioning users: ${mentionText} for ${resourceType.slice(0, -1)}: ${resource.id}`);
+    log(`Mentioning users: ${mentionText} for ${resourceType}: ${resource.id}`);
     if (!dryRun) {
       const notesClient = this.getNotesApiClient(resourceType);
       await notesClient.create(resource.project_id, resource.iid, mentionText);
@@ -212,7 +215,7 @@ export class ActionExecutor {
   async addComment(resource, actions, resourceType, dryRun) {
     const { comment_type, comment_internal } = actions;
     const comment = unmarkComment(resource, actions.comment);
-    log(`Adding comment to ${resourceType.slice(0, -1)}: ${resource.id} ${comment}`);
+    log(`Adding comment to ${resourceType}: ${resource.id} ${comment}`);
     if (!dryRun) {
       const options = {
         internal: comment_internal || false,
