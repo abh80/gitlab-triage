@@ -1,5 +1,6 @@
 import debug from 'debug';
 import chalk from 'chalk';
+import * as path from 'node:path';
 
 const log = debug('platinum-triage:actionExecutor');
 
@@ -55,6 +56,12 @@ export class ActionExecutor {
       }
       if (actions.merge && resourceType === 'merge_request') {
         resource = await this.mergeMergeRequest(resource, actions.merge, dryRun);
+      }
+      if (actions.extension) {
+        log('Executing custom script action from ' + actions.extension);
+        const script = await import(path.join(process.cwd() , actions.extension));
+        const instanceOfScript = new script(this);
+        await instanceOfScript.run(resource, resourceType, dryRun);
       }
     }
   }
