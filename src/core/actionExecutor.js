@@ -38,22 +38,22 @@ export class ActionExecutor {
       if (actions.mention) {
         resource = await this.mentionUsers(resource, actions.mention, resourceType, dryRun);
       }
-      if (actions.move && resourceType === 'issues') {
+      if (actions.move && resourceType === 'issue') {
         resource = await this.moveResource(resource, actions.move, dryRun);
       }
       if (actions.comment) {
         resource = await this.addComment(resource, actions, resourceType, dryRun);
       }
-      if (actions.delete && resourceType === 'branches') {
+      if (actions.delete && resourceType === 'branch') {
         await this.deleteBranch(resource, dryRun);
       }
       if (actions.assignee) {
         resource = await this.assignResource(resource, actions.assignee, resourceType, dryRun);
       }
-      if (actions.reviewer && resourceType === 'merge_requests') {
+      if (actions.reviewer && resourceType === 'merge_request') {
         resource = await this.assignReviewer(resource, actions.reviewer, dryRun);
       }
-      if (actions.merge && resourceType === 'merge_requests') {
+      if (actions.merge && resourceType === 'merge_request') {
         resource = await this.mergeMergeRequest(resource, actions.merge, dryRun);
       }
     }
@@ -66,9 +66,9 @@ export class ActionExecutor {
    */
   getApiClient(resourceType) {
     switch (resourceType) {
-      case 'issues':
+      case 'issue':
         return this.gitlab.Issues;
-      case 'merge_requests':
+      case 'merge_request':
         return this.gitlab.MergeRequests;
       default:
         throw new Error(`Unsupported resource type: ${resourceType}`);
@@ -82,9 +82,9 @@ export class ActionExecutor {
    */
   getNotesApiClient(resourceType) {
     switch (resourceType) {
-      case 'issues':
+      case 'issue':
         return this.gitlab.IssueNotes;
-      case 'merge_requests':
+      case 'merge_request':
         return this.gitlab.MergeRequestNotes;
       default:
         throw new Error(`Unsupported resource type: ${resourceType}`);
@@ -128,9 +128,9 @@ export class ActionExecutor {
       const apiClient = this.getApiClient(resourceType);
       const updateParams = {};
 
-      if (resourceType === 'issues') {
+      if (resourceType === 'issue') {
         updateParams.stateEvent = status;
-      } else if (resourceType === 'merge_requests') {
+      } else if (resourceType === 'merge_request') {
         // For merge requests, status can be 'close', 'reopen', or 'merge'
         if (status === 'close' || status === 'reopen') {
           updateParams.stateEvent = status;
@@ -212,7 +212,7 @@ export class ActionExecutor {
       };
 
       // Note: comment_type might not be applicable for merge requests
-      if (resourceType === 'issues' && comment_type) {
+      if (resourceType === 'issue' && comment_type) {
         options.type = comment_type;
       }
 
