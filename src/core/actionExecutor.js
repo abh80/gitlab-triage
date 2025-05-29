@@ -44,7 +44,7 @@ export class ActionExecutor {
         resource = await this.moveResource(resource, actions.move, dryRun);
       }
       if (actions.comment) {
-        resource = await this.addComment(resource, actions, resourceType, dryRun);
+        await this.addComment(resource, actions, resourceType, dryRun);
       }
       if (actions.delete && resourceType === 'branch') {
         await this.deleteBranch(resource, dryRun);
@@ -227,7 +227,7 @@ export class ActionExecutor {
       }
 
       const notesClient = this.getNotesApiClient(resourceType);
-      await notesClient.create(resource.project_id, resource.iid, comment, options);
+      return notesClient.create(resource.project_id, resource.iid, comment, options);
     }
 
     return resource;
