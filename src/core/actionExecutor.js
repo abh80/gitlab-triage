@@ -60,9 +60,7 @@ export class ActionExecutor {
       }
       if (actions.extension) {
         log('Executing custom script action from ' + actions.extension);
-        const filePath = path.join(process.cwd(), actions.extension);
-        const fileUrl = pathToFileURL(path.resolve(filePath)).href;
-        const script = await import(fileUrl);
+        const script = await import(actions.extension);
         const instanceOfScript = new script.default(this);
         await instanceOfScript.run(resource, resourceType, dryRun);
       }
