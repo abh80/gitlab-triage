@@ -15,7 +15,15 @@ export class ActionExecutor {
    */
   constructor(gitlab) {
     this.gitlab = gitlab;
+    this.extensionLoaded = new Map();
   }
+
+  registerExtension(extensionClass, alias) {
+      if (!extensionClass || !alias) {
+        throw new Error("Both extensionClass and alias are required to register an extension.");
+      }
+      this.extensionLoaded.set(alias, new extensionClass(this));
+    }
 
   /**
    * Executes actions on the provided resources.
@@ -60,7 +68,14 @@ export class ActionExecutor {
       }
       if (actions.extension) {
         log('Executing custom script action from ' + actions.extension);
-        const script = await import(actions.extension);
+        if (this.extensionLoaded.has(actions.extension)) {
+          log("Founded already loaded extension")
+          await this.extensionLoaded.get(actions.extension).run(resource, resourceType, dryRun)
+          return;
+        }
+        const filePath = path.join(process.cwd(), actions.extension);
+        const fileUrl = pathToFileURL(path.resolve(filePath)).href;
+        const script = await import(fileUrl);
         const instanceOfScript = new script.default(this);
         await instanceOfScript.run(resource, resourceType, dryRun);
       }
