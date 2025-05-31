@@ -19,7 +19,10 @@ export class PlatinumTriageHookManager extends PlatinumTriage {
             });
         }
     }
-
+    registerExtension(extensionClass, alias) {
+        this.actionExecutor.registerExtension(extensionClass, alias);
+    }
+    
     async handleEvent(headers, restBody) {
         if (!this.config) throw new Error(`Policy was not initialized, call the \`init\` function before proceeding.`);
         if (!headers || typeof headers != 'object' || !headers.get('x-gitlab-event')) throw new Error(`Headers was not provided, must be object of Headers received from Gitlab.`);
