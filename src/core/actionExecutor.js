@@ -2,6 +2,7 @@ import debug from 'debug';
 import chalk from 'chalk';
 import * as path from 'node:path';
 import { pathToFileURL } from 'url';
+import { Gitlab } from '@gitbeaker/rest';
 
 const log = debug('platinum-triage:actionExecutor');
 
@@ -200,8 +201,7 @@ export class ActionExecutor {
         squash_commit_message: mergeOptions.squash_commit_message || undefined,
         squash: mergeOptions.squash || false,
       };
-
-      return await this.gitlab.MergeRequests.accept(resource.project_id, resource.iid, options);
+      return await this.gitlab.MergeRequests.merge(resource.project_id, resource.iid, options);
     }
     return resource;
   }
