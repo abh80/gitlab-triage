@@ -19,10 +19,11 @@ export class PlatinumTriageHookManager extends PlatinumTriage {
             });
         }
     }
+    
     registerExtension(extensionClass, alias) {
         this.actionExecutor.registerExtension(extensionClass, alias);
     }
-    
+
     async handleEvent(headers, restBody) {
         if (!this.config) throw new Error(`Policy was not initialized, call the \`init\` function before proceeding.`);
         if (!headers || typeof headers != 'object' || !headers.get('x-gitlab-event')) throw new Error(`Headers was not provided, must be object of Headers received from Gitlab.`);
@@ -85,7 +86,7 @@ export class PlatinumTriageHookManager extends PlatinumTriage {
         if (hooks.length > 0) {
             console.log(chalk.blue(`Executing ${hooks.length} hooks for event type: merge_request`));
             for (const hook of hooks) {
-                await this.executeResourceHook(hook, restBody, 'merge_requests');
+                await this.executeResourceHook(hook, restBody, 'merge_request');
             }
         }
 
@@ -98,7 +99,7 @@ export class PlatinumTriageHookManager extends PlatinumTriage {
         let resource;
         if (resourceType === 'issues' && restBody.object_attributes) {
             resource = await this.resourceProcessor.loadResourceByIid('issue', 'project', restBody.project.id, restBody.object_attributes.iid);
-        } else if (resourceType === 'merge_requests' && restBody.object_attributes) {
+        } else if (resourceType === 'merge_request' && restBody.object_attributes) {
             resource = await this.resourceProcessor.loadResourceByIid('merge_request', 'project', restBody.project.id, restBody.object_attributes.iid);
         }
 
@@ -156,7 +157,7 @@ export class PlatinumTriageHookManager extends PlatinumTriage {
             }
             if (restBody.merge_request) {
                 resource = await this.resourceProcessor.loadResourceByIid('merge_request', 'project', restBody.project_id, restBody.merge_request.iid);
-                resourceType = 'merge_requests';
+                resourceType = 'merge_request';
             }
 
             if (!resource || !resourceType) {
@@ -230,14 +231,14 @@ export class PlatinumTriageHookManager extends PlatinumTriage {
                         await this.actionExecutor.assignResource(hook.resource, hook.actions[action], resourceType, false);
                         break;
                     case 'reviewer':
-                        if (resourceType === 'merge_requests') {
+                        if (resourceType === 'merge_request') {
                             await this.actionExecutor.assignReviewer(hook.resource, hook.actions[action], false);
                         } else {
                             console.log(chalk.yellow(`Reviewer action not supported for ${resourceType}`));
                         }
                         break;
                     case 'merge':
-                        if (resourceType === 'merge_requests') {
+                        if (resourceType === 'merge_request') {
                             const mergeOptions = typeof hook.actions[action] === 'object'
                                 ? hook.actions[action]
                                 : { when_pipeline_succeeds: false };
