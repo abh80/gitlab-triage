@@ -194,14 +194,12 @@ export class ActionExecutor {
   async mergeMergeRequest(resource, mergeOptions, dryRun) {
     log(`Merging merge request: ${resource.id}`);
     if (!dryRun) {
-      const options = {
-        should_remove_source_branch: mergeOptions.should_remove_source_branch || false,
-        merge_when_pipeline_succeeds: mergeOptions.when_pipeline_succeeds || false,
-        merge_commit_message: mergeOptions.commit_message || undefined,
-        squash_commit_message: mergeOptions.squash_commit_message || undefined,
-        squash: mergeOptions.squash || false,
-      };
-      return await this.gitlab.MergeRequests.merge(resource.project_id, resource.iid, options);
+      if (mergeOptions.cancel) {
+        log(`Canceling merge request: ${resource.id}`);
+        return await this.gitlab.MergeRequests.cancelOnPipelineSuccess(resource.project_id, resource.iid);
+      }
+      
+      return await this.gitlab.MergeRequests.merge(resource.project_id, resource.iid, mergeOptions);
     }
     return resource;
   }
