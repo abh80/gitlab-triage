@@ -210,6 +210,7 @@ export class PlatinumTriageHookManager extends PlatinumTriage {
                                 match.variables.labels.forEach(x => labels.push(x));
                             }
                         }
+                        labels = labels.map(label => label.replace(/^['"]|['"]$/g, ''));
                         await this.actionExecutor.addLabels(hook.resource, labels, resourceType, false);
                         break;
                     }
