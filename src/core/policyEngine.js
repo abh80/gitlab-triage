@@ -261,7 +261,7 @@ export class PolicyEngine {
             let eitherLabels = this.stringToArray(label);
             if (!eitherLabels.some((label_) => labelNames.includes(label_))) return false;
 
-            requiredLabels = requiredLabels.filter(x => !x === label);
+            requiredLabels = requiredLabels.filter(x => x !== label);
         }
         return requiredLabels.every((label) => labelNames.includes(label));
     }
