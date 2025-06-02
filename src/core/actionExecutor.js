@@ -3,6 +3,8 @@ import chalk from 'chalk';
 import * as path from 'node:path';
 import { pathToFileURL } from 'url';
 import { Gitlab } from '@gitbeaker/rest';
+import mongoose from 'mongoose';
+import { TriageSchema } from '../db/PlatinumTriageSchema.js';
 
 const log = debug('platinum-triage:actionExecutor');
 
@@ -17,14 +19,19 @@ export class ActionExecutor {
   constructor(gitlab) {
     this.gitlab = gitlab;
     this.extensionLoaded = new Map();
+    if (process.env.MONGOOSE_URI) {
+      log(chalk.green("Mongoose URI is set, initializing database connection..."));
+      mongoose.connect(process.env.MONGOOSE_URI)
+      this.db = true;
+    }
   }
 
   registerExtension(extensionClass, alias) {
-      if (!extensionClass || !alias) {
-        throw new Error("Both extensionClass and alias are required to register an extension.");
-      }
-      this.extensionLoaded.set(alias, new extensionClass(this));
+    if (!extensionClass || !alias) {
+      throw new Error("Both extensionClass and alias are required to register an extension.");
     }
+    this.extensionLoaded.set(alias, new extensionClass(this));
+  }
 
   /**
    * Executes actions on the provided resources.
@@ -34,7 +41,7 @@ export class ActionExecutor {
    * @param {string} resourceType - The type of resource (e.g., 'issues', 'merge_requests').
    * @param {boolean} dryRun - If true, simulates the actions without making actual changes.
    */
-  async execute(actions, resources, resourceType, dryRun) {
+  async execute(actions, resources, resourceType, dryRun, jobId = null) {
     for (let resource of resources) {
       console.log(chalk.yellow(`Executing actions for resource: ${resource.id}`));
       if (actions.labels) {
@@ -53,7 +60,7 @@ export class ActionExecutor {
         resource = await this.moveResource(resource, actions.move, dryRun);
       }
       if (actions.comment) {
-        await this.addComment(resource, actions, resourceType, dryRun);
+        await this.addComment(resource, actions, resourceType, dryRun, jobId);
       }
       if (actions.delete && resourceType === 'branch') {
         await this.deleteBranch(resource, dryRun);
@@ -198,7 +205,7 @@ export class ActionExecutor {
         log(`Canceling merge request: ${resource.id}`);
         return await this.gitlab.MergeRequests.cancelOnPipelineSuccess(resource.project_id, resource.iid);
       }
-      
+
       return await this.gitlab.MergeRequests.merge(resource.project_id, resource.iid, mergeOptions);
     }
     return resource;
@@ -222,8 +229,15 @@ export class ActionExecutor {
     }
     return resource;
   }
-
-  async addComment(resource, actions, resourceType, dryRun) {
+  /**
+    * @import { IssueSchema, MergeRequestSchema} from "@gitbeaker/rest"
+    * @param {IssueSchema|MergeRequestSchema} resource - The resource object containing data to replace placeholders.
+    * @param {Object} actions - The actions object containing comment details.
+    * @param {string} resourceType - The type of resource (e.g., 'issue', 'merge_request').
+    * @param {boolean} dryRun - If true, simulates the action without making actual changes.
+    * @param {string} jobId - The job ID for tracking the action.
+    * **/
+  async addComment(resource, actions, resourceType, dryRun, jobId = null) {
     const { comment_type, comment_internal } = actions;
     const comment = unmarkComment(resource, actions.comment);
     log(`Adding comment to ${resourceType}: ${resource.id} ${comment}`);
@@ -238,7 +252,41 @@ export class ActionExecutor {
       }
 
       const notesClient = this.getNotesApiClient(resourceType);
-      return notesClient.create(resource.project_id, resource.iid, comment, options);
+      if (this.db && jobId) {
+        log(`Checking existing comment in database for jobId: ${jobId}`);
+        const existingComment = await TriageSchema.findOne({
+          jobId,
+          resourceType,
+          resourceIid: resource.iid,
+          projectId: resource.project_id,
+        });
+
+        if (existingComment) {
+          log(`Found existing comment in database for jobId: ${jobId}`);
+          const note = await notesClient.edit(
+            resource.project_id,
+            resource.iid,
+            existingComment.noteId,
+            { body: comment }
+          );
+          log(`Updated existing comment: ${note.id}`);
+          return note;
+        }
+      }
+      const note = await notesClient.create(resource.project_id, resource.iid, comment, options);
+      if (this.db && jobId) {
+        log(`Saving comment to database for jobId: ${jobId}`);
+        const newComment = new TriageSchema({
+          jobId,
+          resourceType,
+          resourceIid: resource.iid,
+          projectId: resource.project_id,
+          noteId: note.id,
+        }); l̥
+        await newComment.save();
+      }
+      log(`Comment added successfully: ${note.id}`);
+      return note;
     }
 
     return resource;

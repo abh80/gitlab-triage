@@ -200,9 +200,10 @@ export class PlatinumTriage {
 
     console.log(chalk.gray(`${filteredResources.length} resources passed conditions`));
 
+    const jobId = rule.name.replace(/\s+/g, '-').toLowerCase();
     // Execute actions
     if (rule.actions) {
-      await this.actionExecutor.execute(rule.actions, filteredResources, resourceType, dryRun);
+      await this.actionExecutor.execute(rule.actions, filteredResources, resourceType, dryRun, jobId);
     } else {
       console.log(chalk.yellow("No actions found to execute. Skipping..."))
     }

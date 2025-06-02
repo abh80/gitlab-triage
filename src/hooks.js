@@ -64,7 +64,7 @@ export class PlatinumTriageHookManager extends PlatinumTriage {
         if (hooks.length > 0) {
             console.log(chalk.blue(`Executing ${hooks.length} hooks for event type: issue`));
             for (const hook of hooks) {
-                await this.executeResourceHook(hook, restBody, 'issues');
+                await this.executeResourceHook(hook, restBody, 'issue');
             }
         }
 
@@ -97,7 +97,7 @@ export class PlatinumTriageHookManager extends PlatinumTriage {
         console.log(chalk.blue(`Running hook ${hook.name} for ${resourceType}`));
 
         let resource;
-        if (resourceType === 'issues' && restBody.object_attributes) {
+        if (resourceType === 'issue' && restBody.object_attributes) {
             resource = await this.resourceProcessor.loadResourceByIid('issue', 'project', restBody.project.id, restBody.object_attributes.iid);
         } else if (resourceType === 'merge_request' && restBody.object_attributes) {
             resource = await this.resourceProcessor.loadResourceByIid('merge_request', 'project', restBody.project.id, restBody.object_attributes.iid);
@@ -153,7 +153,7 @@ export class PlatinumTriageHookManager extends PlatinumTriage {
 
             if (restBody.issue) {
                 resource = await this.resourceProcessor.loadResourceByIid('issue', 'project', restBody.project_id, restBody.issue.iid);
-                resourceType = 'issues';
+                resourceType = 'issue';
             }
             if (restBody.merge_request) {
                 resource = await this.resourceProcessor.loadResourceByIid('merge_request', 'project', restBody.project_id, restBody.merge_request.iid);
@@ -256,10 +256,11 @@ export class PlatinumTriageHookManager extends PlatinumTriage {
                             comment_type: hook.actions.comment_type,
                             comment_internal: hook.actions.comment_internal
                         };
-                        await this.actionExecutor.addComment(hook.resource, commentActions, resourceType, false);
+                        const jobId = hook.name.replace(/ /g, '-').toLowerCase();
+                        await this.actionExecutor.addComment(hook.resource, commentActions, resourceType, false, jobId);
                         break;
                     case 'move':
-                        if (resourceType === 'issues') {
+                        if (resourceType === 'issue') {
                             await this.actionExecutor.moveResource(hook.resource, hook.actions[action], false);
                         } else {
                             console.log(chalk.yellow(`Move action not supported for ${resourceType}`));
